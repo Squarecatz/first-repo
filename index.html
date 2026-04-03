@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>copyboard — din delte clipboard</title>
+  <meta name="description" content="Del tekst øjeblikkeligt mellem alle enheder på dit netværk. Ingen konto. Ingen app." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono:ital@0;1&family=Manrope:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0c0c0b;
+      --surface:  #141413;
+      --border:   #2a2a27;
+      --border-hi:#3d3d38;
+      --text:     #edeae0;
+      --muted:    #6b6b62;
+      --accent:   #c8a96e;
+      --accent-dim:#7a6540;
+      --green:    #5a9e6f;
+      --mono: 'Fragment Mono', monospace;
+      --sans: 'Manrope', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.4rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+      animation: fadeDown 0.4s ease both;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .logo em {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .dot.connected { background: var(--green); animation: blink 3s ease infinite; }
+    .dot.saving    { background: var(--accent); animation: none; }
+    .dot.error     { background: #c0392b; animation: none; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      60%       { opacity: 0.3; }
+    }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 2rem;
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+
+    .board-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+      transition: border-color 0.2s;
+    }
+
+    .board-wrap:focus-within {
+      border-color: var(--border-hi);
+    }
+
+    textarea {
+      flex: 1;
+      min-height: calc(100vh - 260px);
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 1.6rem 1.8rem;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: var(--text);
+      caret-color: var(--accent);
+    }
+
+    textarea::placeholder {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.2rem;
+      border-top: 1px solid var(--border);
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-left {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .char-count { color: var(--muted); }
+
+    .toolbar-right {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-hi);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    button:hover {
+      color: var(--text);
+      border-color: var(--muted);
+      background: rgba(255,255,255,0.04);
+    }
+
+    button:active { transform: scale(0.97); }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0c0c0b;
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: #d4b87a;
+      border-color: #d4b87a;
+      color: #0c0c0b;
+    }
+
+    button.success {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    /* ── IP badge ── */
+    .ip-badge {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--accent-dim);
+      border: 1px solid var(--accent-dim);
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      animation: fadeUp 0.5s 0.25s ease both;
+    }
+
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--text);
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      header, main, footer { padding-left: 1.1rem; padding-right: 1.1rem; }
+      main { padding-top: 1.1rem; }
+      textarea { min-height: calc(100vh - 300px); font-size: 0.9rem; padding: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">copy<em>board</em></div>
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <span id="statusText">forbinder...</span>
+  </div>
+</header>
+
+<main>
+  <div class="board-wrap">
+    <textarea
+      id="board"
+      spellcheck="false"
+      autocomplete="off"
+      placeholder="Indsæt tekst her — indkøbsliste, links, kodeord, noter...&#10;&#10;Alle enheder på dit netværk ser det samme indhold automatisk."
+    ></textarea>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <span class="char-count" id="charCount">0 tegn</span>
+        <span id="lastSaved">—</span>
+        <span class="ip-badge" id="ipBadge">···</span>
+      </div>
+      <div class="toolbar-right">
+        <button onclick="clearBoard()" id="clearBtn">ryd</button>
+        <button onclick="copyAll()" id="copyBtn" class="primary">kopier alt</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  copyboard &mdash; deler via dit netværks IP &mdash;
+  ingen konto &middot; ingen app &middot; ingen sporing
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const textarea   = document.getElementById('board');
+  const dot        = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+  const charCount  = document.getElementById('charCount');
+  const lastSaved  = document.getElementById('lastSaved');
+  const ipBadge    = document.getElementById('ipBadge');
+  const toast      = document.getElementById('toast');
+  const copyBtn    = document.getElementById('copyBtn');
+
+  let saveTimer   = null;
+  let pollTimer   = null;
+  let cachedValue = null;
+  let isTyping    = false;
+
+  // ── Status helpers ──
+  function setStatus(state, text) {
+    dot.className = 'dot ' + state;
+    statusText.textContent = text;
+  }
+
+  function showToast(msg, duration = 1800) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), duration);
+  }
+
+  function updateCharCount() {
+    const n = textarea.value.length;
+    charCount.textContent = n.toLocaleString('da-DK') + ' tegn';
+  }
+
+  function timeAgo(ts) {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 5)   return 'gemt lige nu';
+    if (diff < 60)  return 'gemt for ' + diff + 's siden';
+    if (diff < 3600) return 'gemt for ' + Math.floor(diff/60) + 'm siden';
+    const d = new Date(ts);
+    return 'gemt ' + d.toLocaleTimeString('da-DK', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  // ── API calls ──
+  async function fetchClipboard() {
+    const res  = await fetch('/api/clipboard');
+    if (!res.ok) throw new Error('fetch failed');
+    return res.json();
+  }
+
+  async function saveClipboard(text) {
+    const res = await fetch('/api/clipboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('save failed');
+    return res.json();
+  }
+
+  // ── Init ──
+  async function init() {
+    try {
+      const data = await fetchClipboard();
+      textarea.value = data.text || '';
+      cachedValue    = textarea.value;
+      ipBadge.textContent = data.ip || '···';
+      if (data.updatedAt) lastSaved.textContent = timeAgo(data.updatedAt);
+      updateCharCount();
+      setStatus('connected', 'synkroniseret');
+    } catch (e) {
+      setStatus('error', 'ingen forbindelse');
+    }
+    startPolling();
+  }
+
+  // ── Typing → debounced save ──
+  textarea.addEventListener('input', () => {
+    updateCharCount();
+    isTyping = true;
+    setStatus('saving', 'skriver...');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      const val = textarea.value;
+      try {
+        const data = await saveClipboard(val);
+        cachedValue = val;
+        if (data.updatedAt) lastSaved.textContent = timeAgo(data.updatedAt);
+        setStatus('connected', 'synkroniseret');
+      } catch(e) {
+        setStatus('error', 'gem fejlede');
+      }
+      isTyping = false;
+    }, 700);
+  });
+
+  // ── Poll for remote changes ──
+  async function poll() {
+    if (isTyping) return;
+    try {
+      const data = await fetchClipboard();
+      if (data.text !== cachedValue) {
+        textarea.value = data.text || '';
+        cachedValue    = textarea.value;
+        updateCharCount();
+        showToast('opdateret fra en anden enhed');
+      }
+      if (data.updatedAt) lastSaved.textContent = timeAgo(data.updatedAt);
+      setStatus('connected', 'synkroniseret');
+    } catch(e) {
+      setStatus('error', 'ingen forbindelse');
+    }
+  }
+
+  function startPolling() {
+    pollTimer = setInterval(poll, 3000);
+  }
+
+  // ── Actions ──
+  async function clearBoard() {
+    if (!textarea.value) return;
+    textarea.value = '';
+    cachedValue    = '';
+    updateCharCount();
+    try {
+      await saveClipboard('');
+      lastSaved.textContent = 'ryddet';
+      setStatus('connected', 'synkroniseret');
+      showToast('board ryddet');
+    } catch(e) { setStatus('error', 'fejl'); }
+  }
+
+  function copyAll() {
+    if (!textarea.value) return;
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      copyBtn.textContent = 'kopieret!';
+      copyBtn.className   = 'success';
+      showToast('kopieret til udklipsholder');
+      setTimeout(() => {
+        copyBtn.textContent = 'kopier alt';
+        copyBtn.className   = 'primary';
+      }, 1800);
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
